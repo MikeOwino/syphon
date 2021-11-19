@@ -231,7 +231,7 @@ class ChatInputState extends State<ChatInput> {
     final pickerResult = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowMultiple: false,
-      allowedExtensions: ['pdf', 'doc', 'txt'],
+      allowedExtensions: ['pdf', 'doc', 'txt', 'mov', 'mp3', 'mp4'],
     );
 
     if (pickerResult == null) return;

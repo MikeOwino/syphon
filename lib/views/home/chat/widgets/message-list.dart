@@ -5,7 +5,11 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_redux/flutter_redux.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:redux/redux.dart';
+import 'package:syphon/global/libs/matrix/constants.dart';
+import 'package:syphon/global/libs/matrix/index.dart';
 import 'package:syphon/global/print.dart';
 import 'package:syphon/store/events/actions.dart';
 import 'package:syphon/store/events/messages/model.dart';
@@ -30,6 +34,7 @@ class MessageList extends StatefulWidget {
   final ScrollController scrollController;
 
   final Function? onSendEdit;
+  final Function? onPressFile;
   final Function? onSelectReply;
   final void Function({Message? message, User? user, String? userId})? onViewUserDetails;
   final void Function(Message?)? onToggleSelectedMessage;
@@ -42,6 +47,7 @@ class MessageList extends StatefulWidget {
     this.editing = false,
     this.selectedMessage,
     this.onSendEdit,
+    this.onPressFile,
     this.onSelectReply,
     this.onViewUserDetails,
     this.onToggleSelectedMessage,
@@ -167,6 +173,7 @@ class MessageListState extends State<MessageList> {
                       timeFormat: props.timeFormat24Enabled! ? '24hr' : '12hr',
                       onSendEdit: widget.onSendEdit,
                       onSwipe: props.onSelectReply,
+                      onPressFile: props.onSelectFile,
                       onPressAvatar: () => widget.onViewUserDetails!(
                         message: message,
                         user: user,
@@ -200,8 +207,9 @@ class _Props extends Equatable {
   final bool? timeFormat24Enabled;
   final Color? chatColorPrimary;
 
-  final Function onToggleReaction;
+  final Function onSelectFile;
   final Function onSelectReply;
+  final Function onToggleReaction;
 
   const _Props({
     required this.room,
@@ -211,8 +219,9 @@ class _Props extends Equatable {
     required this.currentUser,
     required this.timeFormat24Enabled,
     required this.chatColorPrimary,
-    required this.onToggleReaction,
+    required this.onSelectFile,
     required this.onSelectReply,
+    required this.onToggleReaction,
   });
 
   @override
@@ -229,6 +238,28 @@ class _Props extends Equatable {
         chatColorPrimary: selectBubbleColor(store, roomId),
         room: selectRoom(id: roomId, state: store.state),
         users: messageUsers(roomId: roomId, state: store.state),
+        // TODO: partially move to redux
+        onSelectFile: (Message message) async {
+          try {
+            final isFile = message.msgtype != MatrixMessageTypes.text;
+
+            printJson({'message': message});
+
+            if (isFile) {
+              final media = await MatrixApi.fetchMedia(mediaUri: message.url!);
+
+              final tempDir = await getTemporaryDirectory();
+              final filePath = '${tempDir.path}/${message.body}';
+
+              final File file = File(filePath);
+              file.writeAsBytes(media['bodyBytes']);
+
+              OpenFile.open(filePath);
+            }
+          } catch (error) {
+            printError(error.toString());
+          }
+        },
         messages: latestMessages(
           filterMessages(
             combineOutbox(

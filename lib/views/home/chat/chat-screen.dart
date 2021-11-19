@@ -266,7 +266,7 @@ class ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  sendMedia(File file, MessageType type, _Props props) async {
+  onSendMedia(File file, MessageType type, _Props props) async {
     final store = StoreProvider.of<AppState>(context);
     final encryptionEnabled = props.room.encryptionEnabled;
 
@@ -356,23 +356,24 @@ class ChatScreenState extends State<ChatScreen> {
   onAddMedia(File file, MessageType type, _Props props) async {
     final String? mimeType = lookupMimeType(file.path);
 
-    if (mimeType != null){
-      if (mimeType.startsWith('image/')){
-        Navigator.pushNamed(
-          context,
-          Routes.chatMediaPreview,
-          arguments: MediaPreviewArguments(
-            roomId: props.room.id,
-            mediaList: [file],
-            onConfirmSend: () => sendMedia(file, type, props),
-          ),
-        );
-      }
-      else{
-        // if no image send without preview
-        sendMedia(file, type, props);
-      }
+    if (mimeType == null) {
+      return;
     }
+
+    if (mimeType.startsWith('image/')) {
+      return Navigator.pushNamed(
+        context,
+        Routes.chatMediaPreview,
+        arguments: MediaPreviewArguments(
+          roomId: props.room.id,
+          mediaList: [file],
+          onConfirmSend: () => onSendMedia(file, type, props),
+        ),
+      );
+    }
+
+    // if not an image send, without preview
+    onSendMedia(file, type, props);
   }
 
   onToggleSelectedMessage(Message? message) {

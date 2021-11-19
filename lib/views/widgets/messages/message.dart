@@ -1,18 +1,14 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_redux/flutter_redux.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:swipeable/swipeable.dart';
 import 'package:syphon/global/colours.dart';
 import 'package:syphon/global/dimensions.dart';
 import 'package:syphon/global/formatters.dart';
 import 'package:syphon/global/libs/matrix/constants.dart';
-import 'package:syphon/global/libs/matrix/index.dart';
 import 'package:syphon/global/strings.dart';
 import 'package:syphon/store/events/messages/model.dart';
 import 'package:syphon/store/index.dart';
@@ -43,6 +39,7 @@ class MessageWidget extends StatelessWidget {
     this.color,
     this.onSendEdit,
     this.onLongPress,
+    this.onPressFile,
     this.onPressAvatar,
     this.onInputReaction,
     this.onToggleReaction,
@@ -68,6 +65,7 @@ class MessageWidget extends StatelessWidget {
 
   final Function? onSwipe;
   final Function? onSendEdit;
+  final Function? onPressFile;
   final Function? onPressAvatar;
   final Function? onInputReaction;
   final Function? onToggleReaction;
@@ -231,8 +229,8 @@ class MessageWidget extends StatelessWidget {
     final showAvatar = !isLastSender && !isUserSent && !messageOnly;
 
     final isImage = message.msgtype == MatrixMessageTypes.image;
-    final isFile = message.msgtype == MatrixMessageTypes.file;
-    final removePadding = isFile || isImage || (isEditing && selected);
+    final isFile = message.msgtype != MatrixMessageTypes.text && !isImage;
+    final removePadding = isImage || (isEditing && selected);
 
     var textColor = Colors.white;
     var showSender = !messageOnly && !isUserSent; // nearly always show the sender
@@ -519,70 +517,62 @@ class MessageWidget extends StatelessWidget {
                                     ),
                                   ),
                                   Container(
-                                    margin: EdgeInsets.only(
-                                      bottom: 6,
-                                      top: isImage ? 8 : 0,
-                                      left: isImage ? 12 : 0,
-                                      right: isImage ? 12 : 0,
-                                    ),
-                                    child: AnimatedCrossFade(
-                                      duration: const Duration(milliseconds: 150),
-                                      crossFadeState: isEditing && selected
-                                          ? CrossFadeState.showSecond
-                                          : CrossFadeState.showFirst,
-                                      firstChild: GestureDetector(
-                                        onTap: () async{
-                                          if (isFile){
-                                            final media = await MatrixApi.fetchMedia(mediaUri: message.url!);
-
-                                            final tempDir = await getTemporaryDirectory();
-                                            final filePath = '${tempDir.path}/${message.body}';
-
-                                            final File file = File(filePath);
-                                            file.writeAsBytes(media['bodyBytes']);
-
-                                            OpenFile.open(filePath);
-                                          }
-                                        },
-                                        child: MarkdownBody(
-                                          data: body.trim(),
-                                          onTapLink: (text, href, title) =>
-                                              onConfirmLink(context, href),
-                                          styleSheet: MarkdownStyleSheet(
-                                            blockquote: TextStyle(
-                                              backgroundColor: bubbleColor,
-                                            ),
-                                            blockquoteDecoration: BoxDecoration(
-                                              color: replyColor,
-                                              borderRadius: const BorderRadius.only(
-                                                //TODO: shape similar to bubbleBorder
-                                                topLeft: Radius.circular(12),
-                                                topRight: Radius.circular(12),
-                                                bottomLeft: Radius.circular(4),
-                                                bottomRight: Radius.circular(4),
+                                      margin: EdgeInsets.only(
+                                        bottom: 6,
+                                        top: isImage ? 8 : 0,
+                                        left: isImage ? 12 : 0,
+                                        right: isImage ? 12 : 0,
+                                      ),
+                                      child: AnimatedCrossFade(
+                                        duration: const Duration(milliseconds: 150),
+                                        crossFadeState: isEditing && selected
+                                            ? CrossFadeState.showSecond
+                                            : CrossFadeState.showFirst,
+                                        firstChild: GestureDetector(
+                                          onTap: onPressFile != null && isFile
+                                              ? () => onPressFile!(message)
+                                              : null,
+                                          child: MarkdownBody(
+                                            data: body.trim(),
+                                            onTapLink: (text, href, title) =>
+                                                onConfirmLink(context, href),
+                                            styleSheet: MarkdownStyleSheet(
+                                              blockquote: TextStyle(
+                                                backgroundColor: bubbleColor,
+                                              ),
+                                              blockquoteDecoration: BoxDecoration(
+                                                color: replyColor,
+                                                borderRadius: const BorderRadius.only(
+                                                  //TODO: shape similar to bubbleBorder
+                                                  topLeft: Radius.circular(12),
+                                                  topRight: Radius.circular(12),
+                                                  bottomLeft: Radius.circular(4),
+                                                  bottomRight: Radius.circular(4),
+                                                ),
+                                              ),
+                                              p: TextStyle(
+                                                decoration: isFile
+                                                    ? TextDecoration.underline
+                                                    : TextDecoration.none,
+                                                color: textColor,
+                                                fontStyle: fontStyle,
+                                                fontWeight: FontWeight.w300,
+                                                fontSize:
+                                                    Theme.of(context).textTheme.subtitle2!.fontSize,
                                               ),
                                             ),
-                                            p: TextStyle(
-                                              decoration: isFile? TextDecoration.underline : TextDecoration.none,
-                                              color: textColor,
-                                              fontStyle: fontStyle,
-                                              fontWeight: FontWeight.w300,
-                                              fontSize:
-                                              Theme.of(context).textTheme.subtitle2!.fontSize,
+                                          ),
+                                        ),
+                                        secondChild: Padding(
+                                          padding: EdgeInsets.only(left: 12, right: 12),
+                                          child: IntrinsicWidth(
+                                            child: TextFieldInline(
+                                              body: body,
+                                              onEdit: (text) => onSendEdit!(text, message),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      secondChild: Padding(
-                                        padding: EdgeInsets.only(left: 12, right: 12),
-                                        child: IntrinsicWidth(
-                                          child: TextFieldInline(
-                                            body: body,
-                                            onEdit: (text) => onSendEdit!(text, message),
-                                          ),
-                                        ),
-                                      )
-                                  ,)),
+                                      )),
                                   Padding(
                                     padding: EdgeInsets.symmetric(
                                       horizontal: removePadding ? 12 : 0,
